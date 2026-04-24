@@ -3,7 +3,7 @@ const { createClient } = require('@supabase/supabase-js')
 // Cliente admin — bypasea RLS, solo usar en backend para escrituras
 const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
 // Cliente normal — para verificar tokens de usuarios
