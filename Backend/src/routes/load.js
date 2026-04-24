@@ -3,6 +3,24 @@ const router = express.Router()
 const tmdb = require('../services/tmdb')
 const { saveMovies, getMovieByIdFromDB } = require('../services/supabase')
 
+// POST /api/load/bulk?paginas=20
+router.post('/bulk', async (req, res) => {
+    const totalPaginas = Number(req.query.paginas) || 20;
+    let totalCargadas = 0;
+
+    for (let pagina = 1; pagina <= totalPaginas; pagina++) {
+        const data = await tmdb.getPopularMovies(pagina);
+        await saveMovies(data.results);
+        totalCargadas += data.results.length;
+        console.log(`Página ${pagina}/${totalPaginas} cargada`);
+    }
+
+    res.json({
+        message: `${totalCargadas} películas cargadas correctamente`,
+        total: totalCargadas,
+    });
+});
+
 // POST /api/load/popular?page=1
 // Descarga películas populares de TMDb y las guarda en Supabase
 router.post('/popular', async (req, res) => {
