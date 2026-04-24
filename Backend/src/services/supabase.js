@@ -1,5 +1,12 @@
 const { createClient } = require('@supabase/supabase-js')
 
+// Cliente admin — bypasea RLS, solo usar en backend para escrituras
+const supabaseAdmin = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+)
+
+// Cliente normal — para verificar tokens de usuarios
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
@@ -7,20 +14,18 @@ const supabase = createClient(
 
 // ── Películas ─────────────────────────────────────────────────
 
-// Guarda o actualiza un array de películas en Supabase
 async function saveMovies(movies) {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin   // ← usa admin
     .from('movies')
-    .upsert(movies, { onConflict: 'id' })  // si ya existe la actualiza
+    .upsert(movies, { onConflict: 'id' })
 
   if (error) throw error
 }
 
-// Lee películas desde Supabase con búsqueda y paginación
 async function getMoviesFromDB({ search = null, page = 1, limit = 20 } = {}) {
   const offset = (page - 1) * limit
 
-  let query = supabase
+  let query = supabaseAdmin
     .from('movies')
     .select('*', { count: 'exact' })
     .order('vote_average', { ascending: false })
@@ -41,9 +46,8 @@ async function getMoviesFromDB({ search = null, page = 1, limit = 20 } = {}) {
   }
 }
 
-// Lee una película por ID desde Supabase
 async function getMovieByIdFromDB(movieId) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('movies')
     .select('*')
     .eq('id', movieId)
@@ -56,7 +60,7 @@ async function getMovieByIdFromDB(movieId) {
 // ── Favoritos ─────────────────────────────────────────────────
 
 async function getFavorites(userId) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('favorites')
     .select(`
       id,
@@ -73,7 +77,7 @@ async function getFavorites(userId) {
 }
 
 async function addFavorite(userId, movieId) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('favorites')
     .insert({ user_id: userId, movie_id: movieId })
     .select()
@@ -84,7 +88,7 @@ async function addFavorite(userId, movieId) {
 }
 
 async function removeFavorite(userId, movieId) {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('favorites')
     .delete()
     .eq('user_id', userId)
@@ -94,6 +98,7 @@ async function removeFavorite(userId, movieId) {
 }
 
 module.exports = {
+  supabase,        // exporta el cliente normal para el middleware de auth
   saveMovies,
   getMoviesFromDB,
   getMovieByIdFromDB,
