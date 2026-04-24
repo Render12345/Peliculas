@@ -1,9 +1,4 @@
-const { createClient } = require('@supabase/supabase-js')
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
-)
+const { supabase } = require('../services/supabase')  // ← importa el cliente normal
 
 module.exports = async function authMiddleware(req, res, next) {
   const authHeader = req.headers['authorization']
@@ -27,7 +22,7 @@ module.exports = async function authMiddleware(req, res, next) {
       })
     }
 
-    req.user = data.user  // disponible en todos los handlers como req.user.id
+    req.user = data.user
     next()
   } catch (err) {
     return res.status(401).json({
