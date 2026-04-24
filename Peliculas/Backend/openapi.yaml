@@ -1,0 +1,614 @@
+openapi: 3.0.3
+info:
+  title: Películas API
+  description: |
+    API REST para gestión de películas y favoritos.
+    
+    - Las rutas `/api/movies` son **públicas**.
+    - Las rutas `/api/favorites` y `/api/load` requieren un **JWT de Supabase** en el header `Authorization: Bearer <token>`.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:3000
+    description: Servidor local de desarrollo
+
+tags:
+  - name: Health
+    description: Estado del servidor
+  - name: Movies
+    description: Consulta de películas (público)
+  - name: Favorites
+    description: Favoritos del usuario autenticado
+  - name: Load
+    description: Carga de películas desde TMDb a Supabase (requiere auth)
+
+# =============================================
+# COMPONENTES REUTILIZABLES
+# =============================================
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT obtenido desde Supabase Auth
+
+  schemas:
+    Movie:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 550
+        title:
+          type: string
+          example: "Fight Club"
+        overview:
+          type: string
+          example: "Un oficinista insomne y un vendedor de jabón forman un club de peleas clandestino."
+        poster_url:
+          type: string
+          format: uri
+          example: "https://image.tmdb.org/t/p/w500/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg"
+        backdrop_url:
+          type: string
+          format: uri
+          example: "https://image.tmdb.org/t/p/original/rr7E0NoGKxvbkb89eR1GwfoYjpA.jpg"
+        year:
+          type: string
+          example: "1999"
+        vote_average:
+          type: number
+          format: float
+          example: 8.4
+        genres:
+          type: array
+          items:
+            type: string
+          example: ["Drama", "Thriller"]
+        runtime:
+          type: integer
+          description: Duración en minutos
+          example: 139
+        tagline:
+          type: string
+          example: "Mischief. Mayhem. Soap."
+        loaded_at:
+          type: string
+          format: date-time
+          example: "2025-04-20T10:30:00Z"
+
+    MovieListResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Movie'
+        total_results:
+          type: integer
+          example: 200
+        total_pages:
+          type: integer
+          example: 20
+        current_page:
+          type: integer
+          example: 1
+
+    Favorite:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "a3f1c2d4-1234-5678-abcd-ef0123456789"
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-04-20T10:30:00Z"
+        movies:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 550
+            title:
+              type: string
+              example: "Fight Club"
+            poster_url:
+              type: string
+              format: uri
+            year:
+              type: string
+              example: "1999"
+            vote_average:
+              type: number
+              example: 8.4
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Descripción del error"
+        code:
+          type: string
+          example: "ERROR_CODE"
+
+# =============================================
+# PATHS
+# =============================================
+paths:
+
+  # --- HEALTH ---
+  /health:
+    get:
+      tags: [Health]
+      summary: Verificar estado del servidor
+      responses:
+        '200':
+          description: Servidor funcionando correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: "2025-04-20T12:00:00.000Z"
+
+  # --- MOVIES ---
+  /api/movies:
+    get:
+      tags: [Movies]
+      summary: Listar películas con paginación
+      description: Devuelve películas almacenadas en Supabase. Permite buscar por título y paginar los resultados.
+      parameters:
+        - name: search
+          in: query
+          description: Filtrar películas por título (búsqueda parcial, no sensible a mayúsculas)
+          required: false
+          schema:
+            type: string
+          example: "batman"
+        - name: page
+          in: query
+          description: Número de página (inicia en 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          example: 1
+        - name: limit
+          in: query
+          description: Cantidad de películas por página
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          example: 10
+      responses:
+        '200':
+          description: Lista de películas obtenida correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MovieListResponse'
+        '500':
+          description: Error interno al consultar la base de datos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Error al obtener películas"
+                code: "DB_ERROR"
+
+  /api/movies/{id}:
+    get:
+      tags: [Movies]
+      summary: Obtener detalle de una película por ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID numérico de la película (mismo ID que usa TMDb)
+          schema:
+            type: integer
+          example: 550
+      responses:
+        '200':
+          description: Película encontrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Movie'
+        '400':
+          description: ID inválido (no es un número)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "ID de película inválido"
+                code: "INVALID_ID"
+        '404':
+          description: Película no encontrada en la base de datos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Película no encontrada"
+                code: "NOT_FOUND"
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # --- FAVORITES ---
+  /api/favorites:
+    get:
+      tags: [Favorites]
+      summary: Obtener favoritos del usuario autenticado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Lista de favoritos del usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Favorite'
+        '401':
+          description: No autenticado o token inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Token de autorización requerido"
+                code: "UNAUTHORIZED"
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: [Favorites]
+      summary: Agregar una película a favoritos
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [movie_id]
+              properties:
+                movie_id:
+                  type: integer
+                  description: ID de la película a agregar
+                  example: 550
+      responses:
+        '201':
+          description: Favorito agregado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Favorite'
+        '400':
+          description: Falta el campo movie_id en el body
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "movie_id es requerido"
+                code: "INVALID_BODY"
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: La película no existe en la base de datos local (hay que cargarla primero)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "La película no existe, cárgala primero con /api/load/movie/:id"
+                code: "MOVIE_NOT_LOADED"
+        '409':
+          description: La película ya está en favoritos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "La película ya está en favoritos"
+                code: "ALREADY_EXISTS"
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/favorites/{movie_id}:
+    delete:
+      tags: [Favorites]
+      summary: Eliminar una película de favoritos
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: movie_id
+          in: path
+          required: true
+          description: ID numérico de la película a eliminar de favoritos
+          schema:
+            type: integer
+          example: 550
+      responses:
+        '204':
+          description: Favorito eliminado correctamente (sin contenido)
+        '400':
+          description: ID inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "ID inválido"
+                code: "INVALID_ID"
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error interno
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # --- LOAD ---
+  /api/load/bulk:
+    post:
+      tags: [Load]
+      summary: Carga masiva de películas populares desde TMDb
+      description: Descarga múltiples páginas de películas populares de TMDb y las guarda en Supabase. Por defecto carga 20 páginas (~400 películas).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: paginas
+          in: query
+          description: Número de páginas de TMDb a descargar (cada página tiene ~20 películas)
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+          example: 10
+      responses:
+        '200':
+          description: Carga masiva completada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "200 películas cargadas correctamente"
+                  total:
+                    type: integer
+                    example: 200
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error al conectar con TMDb o Supabase
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/load/popular:
+    post:
+      tags: [Load]
+      summary: Cargar una página de películas populares desde TMDb
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: Página de TMDb a cargar
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          example: 1
+      responses:
+        '200':
+          description: Página cargada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "20 películas cargadas correctamente"
+                  total_pages:
+                    type: integer
+                    example: 500
+                  current_page:
+                    type: integer
+                    example: 1
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error al cargar películas populares
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Error al cargar películas populares"
+                code: "LOAD_ERROR"
+
+  /api/load/search:
+    post:
+      tags: [Load]
+      summary: Buscar y cargar películas desde TMDb por nombre
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: Término de búsqueda
+          schema:
+            type: string
+          example: "batman"
+        - name: page
+          in: query
+          required: false
+          description: Página de resultados de TMDb
+          schema:
+            type: integer
+            default: 1
+          example: 1
+      responses:
+        '200':
+          description: Resultados cargados correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "15 películas cargadas correctamente"
+                  total_pages:
+                    type: integer
+                    example: 3
+                  current_page:
+                    type: integer
+                    example: 1
+        '400':
+          description: Falta el parámetro query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "El parámetro query es requerido"
+                code: "MISSING_QUERY"
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Error al cargar búsqueda
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Error al cargar búsqueda"
+                code: "LOAD_ERROR"
+
+  /api/load/movie/{id}:
+    post:
+      tags: [Load]
+      summary: Cargar el detalle completo de una película específica desde TMDb
+      description: Descarga una película específica de TMDb (con géneros, runtime, tagline, etc.) y la guarda o actualiza en Supabase.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la película en TMDb
+          schema:
+            type: integer
+          example: 550
+      responses:
+        '200':
+          description: Película cargada correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Película cargada correctamente"
+                  movie:
+                    $ref: '#/components/schemas/Movie'
+        '400':
+          description: ID inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "ID inválido"
+                code: "INVALID_ID"
+        '401':
+          description: No autenticado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Película no encontrada en TMDb
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Película no encontrada en TMDb"
+                code: "NOT_FOUND"
+        '500':
+          description: Error al cargar la película
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: "Error al cargar película"
+                code: "LOAD_ERROR"

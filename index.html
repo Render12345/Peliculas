@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieFlix - Explorador de Películas</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+   
+
+    <div id="pantalla-login" class="pantalla-login">
+        <div class="caja-login">
+            <h1>MovieFlix</h1>
+            <p>Inicia sesión para explorar las mejores películas</p>
+            <button id="btn-login-github" class="boton-oauth github">Iniciar sesión con GitHub</button>
+        </div>
+    </div>
+
+    <header>
+        <h1>MovieFlix</h1>
+        <div class="controles-header">
+            <input type="text" id="buscador" placeholder="Buscar películas...">
+            <button id="btn-logout" class="boton-salir oculto">Salir</button>
+        </div>
+    </header>
+
+    <main>
+        <h2 id="mensaje-cargando" class="mensaje-estado oculto">Cargando películas...</h2>
+        <h2 id="mensaje-vacio" class="mensaje-estado oculto">No se encontraron resultados para tu búsqueda.</h2>
+
+        <!--<div class="contenedor-boton">
+            <button onclick="cargarPelisAhora()" class="boton-netflix" style="background-color: red;">¡LLENAR BASE DE DATOS!</button>
+        </div> -->
+
+        <div id="contenedor-peliculas" class="grid-peliculas">
+            </div>
+
+        <div class="contenedor-boton">
+            <button id="btn-cargar-mas" class="boton-netflix">Cargar más</button>
+        </div>
+    </main>
+
+    <div id="modal-detalle" class="modal">
+        <div class="modal-contenido">
+            <span class="boton-cerrar" onclick="cerrarModal()">&times;</span>
+            <div class="modal-layout">
+                <img id="modal-poster" src="" alt="Poster">
+                <div class="modal-info">
+                    <h2 id="modal-titulo"></h2>
+                    <p class="modal-anio" id="modal-anio"></p>
+                    <p id="modal-sinopsis"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="app.js"></script>
+</body>
+</html>
